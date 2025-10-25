@@ -14,19 +14,200 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  phone        String?
+  roleId       String   @map("role_id")
+  isActive     Boolean  @default(true) @map("is_active")
+  lastLogin    DateTime? @map("last_login")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  role         Role     @relation(fields: [roleId], references: [id])
+  assignedLeads Lead[]  @relation("LeadAssignment")
+  activities   Activity[]
+  verifiedDocuments Document[] @relation("DocumentVerification")
+
+  @@map("users")
 }
 
-model Post {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  permissions String   // JSON string of permissions
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  users       User[]
+
+  @@map("roles")
+}
+
+model Lead {
+  id                 String    @id @default(cuid())
+  name               String
+  email              String?
+  phone              String
+  budget             Float?
+  locationPreference String?   @map("location_preference")
+  investmentTimeline String?   @map("investment_timeline")
+  status             String    @default("new")
+  type               String    @default("suspect")
+  source             String?
+  assignedTo         String?   @map("assigned_to")
+  postponedUntil     DateTime? @map("postponed_until")
+  lostReason         String?   @map("lost_reason")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  assignedUser       User?     @relation("LeadAssignment", fields: [assignedTo], references: [id])
+  activities         Activity[]
+  meetings           Meeting[]
+  payments           Payment[]
+  registrations      Registration[]
+
+  @@map("leads")
+}
+
+model Activity {
+  id            String   @id @default(cuid())
+  leadId        String   @map("lead_id")
+  userId        String   @map("user_id")
+  type          String
+  dateTimeFrom  DateTime @map("date_time_from")
+  dateTimeTo    DateTime @map("date_time_to")
+  location      String?
+  notes         String?
+  status        String   @default("scheduled")
+  completedAt   DateTime? @map("completed_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  lead          Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@map("activities")
+}
+
+model Project {
+  id                    String   @id @default(cuid())
+  name                  String
+  builder               String
+  location              String
+  address               String?
+  pinCode               String?  @map("pin_code")
+  reraId                String   @unique @map("rera_id")
+  reraRegistrationDate  DateTime? @map("rera_registration_date")
+  unitsTotal            Int?     @map("units_total")
+  unitsAvailable        Int?     @map("units_available")
+  unitTypes             String?  @map("unit_types") // JSON string
+  priceRangeMin         Float?   @map("price_range_min")
+  priceRangeMax         Float?   @map("price_range_max")
+  possessionDate        DateTime? @map("possession_date")
+  amenities             String?  // JSON string
+  nocStatus             String?  @map("noc_status")
+  documents             String?  // JSON string
+  isActive              Boolean  @default(true) @map("is_active")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  meetings              Meeting[]
+  payments              Payment[]
+
+  @@map("projects")
+}
+
+model Meeting {
+  id              String   @id @default(cuid())
+  leadId          String   @map("lead_id")
+  projectId       String?  @map("project_id")
+  type            String
+  propertyDetails String?  @map("property_details") // JSON string
+  objections      String?  // JSON string
+  resolutions     String?  // JSON string
+  referrals       String?  // JSON string
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  lead            Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  project         Project? @relation(fields: [projectId], references: [id])
+
+  @@map("meetings")
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  leadId        String   @map("lead_id")
+  projectId     String?  @map("project_id")
+  extent        Float?
+  totalCost     Float    @map("total_cost")
+  advancePaid   Float    @map("advance_paid")
+  advanceDate   DateTime @map("advance_date")
+  balance       Float
+  schedule      String   // JSON string
+  paymentMethod String?  @map("payment_method")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  lead          Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  project       Project? @relation(fields: [projectId], references: [id])
+  registrations  Registration[]
+
+  @@map("payments")
+}
+
+model Registration {
+  id                   String   @id @default(cuid())
+  leadId               String   @map("lead_id")
+  paymentId            String?  @map("payment_id")
+  clientName           String   @map("client_name")
+  propertyName         String   @map("property_name")
+  extent               Float
+  price                Float
+  nocStatus            String   @map("noc_status")
+  registrationDateTime DateTime? @map("registration_date_time")
+  subRegistrarOffice   String?  @map("sub_registrar_office")
+  documentNumber       String?  @map("document_number")
+  deliveryDate         DateTime? @map("delivery_date")
+  status               String   @default("pending")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  lead                 Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  payment              Payment? @relation(fields: [paymentId], references: [id])
+  documents            Document[]
+
+  @@map("registrations")
+}
+
+model Document {
+  id             String   @id @default(cuid())
+  registrationId String   @map("registration_id")
+  type           String
+  filePath       String   @map("file_path")
+  fileName       String   @map("file_name")
+  fileSize       Int?     @map("file_size")
+  mimeType       String?  @map("mime_type")
+  status         String   @default("pending")
+  verifiedBy     String?  @map("verified_by")
+  verifiedAt     DateTime? @map("verified_at")
+  rejectionReason String?  @map("rejection_reason")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  verifier       User?         @relation("DocumentVerification", fields: [verifiedBy], references: [id])
+
+  @@map("documents")
 }
